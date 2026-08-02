@@ -3,7 +3,7 @@ const { ok, err, readBody, requireAuth } = require('../_lib/http');
 const { PAGES } = require('../_lib/fixtures');
 
 module.exports = async (req, res) => {
-  const param = req.query.slug;
+  const param = req.query.id;
 
   if (req.method === 'GET') {
     const user = requireAuth(req, res);
