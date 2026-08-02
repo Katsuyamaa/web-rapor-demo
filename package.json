@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "description": "Stateless, database-free portfolio demo backend (Vercel Node serverless functions) serving fictional fixture data for Örnek Gıda A.Ş.",
+  "scripts": {
+    "dev:api": "node dev-server.js"
+  },
   "dependencies": {
     "xlsx": "^0.18.5"
   }
