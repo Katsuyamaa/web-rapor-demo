@@ -1,0 +1,9 @@
+{
+  "name": "web-rapor-demo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Stateless, database-free portfolio demo backend (Vercel Node serverless functions) serving fictional fixture data for Örnek Gıda A.Ş.",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
