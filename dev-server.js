@@ -3,49 +3,15 @@
  * Local API dev server that mimics Vercel's file-based /api routing without
  * requiring `vercel login`. Run this alongside `npm run dev` (Vite) in
  * frontend/ — vite.config.js proxies /api to this server on port 3000.
+ * Uses the same router as the Vercel catch-all function (api/[...path].js).
  */
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const { buildRouter } = require('./api/_lib/router');
 
-const API_DIR = path.join(__dirname, 'api');
 const PORT = process.env.PORT || 3000;
-
-function walk(dir, base = '') {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  let files = [];
-  for (const entry of entries) {
-    if (entry.name === '_lib') continue;
-    const full = path.join(dir, entry.name);
-    const rel = base ? `${base}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      files = files.concat(walk(full, rel));
-    } else if (entry.name.endsWith('.js')) {
-      files.push(rel);
-    }
-  }
-  return files;
-}
-
-function toRoute(relPath) {
-  const noExt = relPath.slice(0, -3);
-  const segments = noExt.split('/');
-  if (segments[segments.length - 1] === 'index') segments.pop();
-  const paramNames = [];
-  const regexParts = segments.map((seg) => {
-    const m = seg.match(/^\[(.+)\]$/);
-    if (m) {
-      paramNames.push(m[1]);
-      return '([^/]+)';
-    }
-    return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  });
-  const pattern = '^/' + regexParts.join('/') + '/?$';
-  return { regex: new RegExp(pattern), paramNames, isDynamic: paramNames.length > 0, filePath: relPath };
-}
-
-const routes = walk(API_DIR).map(toRoute).sort((a, b) => Number(a.isDynamic) - Number(b.isDynamic));
+const router = buildRouter(path.join(__dirname, 'api', '_handlers'));
 
 const server = http.createServer(async (req, res) => {
   const parsed = new URL(req.url, `http://localhost:${PORT}`);
@@ -62,28 +28,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const apiPath = pathname.slice(4);
-  const match = routes.find((r) => r.regex.test(apiPath));
-  if (!match) {
+  const found = router.match(apiPath);
+  if (!found) {
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify({ error: `Route not found: ${apiPath}` }));
     return;
   }
 
-  const m = apiPath.match(match.regex);
-  const params = {};
-  match.paramNames.forEach((name, i) => { params[name] = decodeURIComponent(m[i + 1]); });
   const searchParams = Object.fromEntries(parsed.searchParams.entries());
-  req.query = { ...searchParams, ...params };
+  req.query = { ...searchParams, ...found.params };
 
   try {
-    const modPath = path.join(API_DIR, match.filePath);
-    delete require.cache[require.resolve(modPath)];
-    const mod = require(modPath);
+    delete require.cache[require.resolve(found.absPath)];
+    const mod = require(found.absPath);
     const fn = mod.default || mod;
     await fn(req, res);
   } catch (e) {
-    console.error(`[${match.filePath}]`, e);
+    console.error(`[${apiPath}]`, e);
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -94,5 +56,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Local API dev server (mimics Vercel functions) -> http://localhost:${PORT}/api/*`);
-  console.log(`Routes loaded: ${routes.length}`);
+  console.log(`Routes loaded: ${router.count}`);
 });
