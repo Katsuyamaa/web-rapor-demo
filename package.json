@@ -7,7 +7,7 @@
     "dev:api": "node dev-server.js"
   },
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "dependencies": {
     "xlsx": "^0.18.5"
